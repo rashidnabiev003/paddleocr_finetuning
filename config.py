@@ -1,13 +1,13 @@
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[0]
 
 PDF_DIR = ROOT / "input_pdf"
 DATASET_DIR = ROOT / "train_data"
 PAGES_DIR = DATASET_DIR / "pages_jpeg"
-CROPS_DIR = DATASET_DIR / "crop_img"
+CROPS_DIR = DATASET_DIR / "crop_images"
 
-DPI = 800
+DPI = 1200
 JPEG_QUALITY = 100
 
 DET_MODEL = "PP-OCRv5_server_det"

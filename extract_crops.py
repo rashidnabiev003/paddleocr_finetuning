@@ -1,12 +1,19 @@
 import csv
 import json
+from pathlib import Path
 
 import cv2
 import numpy as np
 from paddleocr import TextDetection
 from tqdm import tqdm
 
-from config import PAGES_DIR, CROPS_DIR, DATASET_DIR, DET_MODEL, MIN_SCORE, PAD
+from config import DET_MODEL, MIN_SCORE, PAD
+
+ROOT = Path(__file__).resolve().parent
+
+DATASET_DIR = ROOT / "train_data"
+PAGES_DIR = DATASET_DIR / "pages_jpeg"
+CROPS_DIR = DATASET_DIR / "crop_images"
 
 
 def result_payload(res):
@@ -65,25 +72,38 @@ def sort_boxes(polys, scores):
     return [(poly, score) for _, _, poly, score in sorted(items)]
 
 
+def find_pages():
+    if not PAGES_DIR.exists():
+        raise FileNotFoundError(f"Pages dir not found: {PAGES_DIR}")
+
+    pages = sorted(
+        p for p in PAGES_DIR.iterdir()
+        if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg"}
+    )
+
+    if not pages:
+        raise FileNotFoundError(f"No JPEG files found in: {PAGES_DIR}")
+
+    return pages
+
+
 def main():
     CROPS_DIR.mkdir(parents=True, exist_ok=True)
 
+    pages = find_pages()
     detector = TextDetection(model_name=DET_MODEL)
     manifest = DATASET_DIR / "manifest.tsv"
 
     with manifest.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f, delimiter="\t")
-        writer.writerow(["crop_path", "label", "doc", "page", "box", "score", "poly"])
-
-        pages = sorted(PAGES_DIR.glob("*/*.jpg"))
+        writer.writerow(["crop_path", "label", "page_image", "box", "score", "poly"])
 
         for page_path in tqdm(pages, desc="extract crops"):
             img = cv2.imread(str(page_path))
-            doc_name = page_path.parent.name
-            page_name = page_path.stem
 
-            out_dir = CROPS_DIR / doc_name / page_name
-            out_dir.mkdir(parents=True, exist_ok=True)
+            if img is None:
+                print(f"[SKIP] cannot read image: {page_path}")
+                continue
 
             result = detector.predict(str(page_path), batch_size=1)
 
@@ -103,7 +123,7 @@ def main():
                     if crop is None:
                         continue
 
-                    crop_path = out_dir / f"b{idx:04d}.png"
+                    crop_path = CROPS_DIR / f"{page_path.stem}_b{idx:04d}.png"
                     cv2.imwrite(str(crop_path), crop)
 
                     rel = crop_path.relative_to(DATASET_DIR).as_posix()
@@ -111,8 +131,7 @@ def main():
                     writer.writerow([
                         rel,
                         "",
-                        doc_name,
-                        page_name,
+                        page_path.name,
                         idx,
                         score,
                         json.dumps(np.asarray(poly).tolist(), ensure_ascii=False),
