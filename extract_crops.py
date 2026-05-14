@@ -170,7 +170,20 @@ def main():
                 print(f"[SKIP] cannot read image: {page_path}")
                 continue
 
-            result = ocr.predict(str(page_path))
+            try:
+                h, w = img.shape[:2]
+                max_dim = 3500
+                if h > max_dim or w > max_dim:
+                    scale = max_dim / max(h, w)
+                    img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+                result = ocr.predict(img)
+            except cv2.error as e:
+                tqdm.write(f"[WARN] Skipping {page_path.name} : {e}")
+                continue
+            except Exception as e:
+                tqdm.write(f"[WARN] Skipping {page_path.name} : {e}")
+                continue
 
             for res in result:
                 payload = result_payload(res)

@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+input_pdf
+train_data
+
+
 # C extensions
 *.so
 
